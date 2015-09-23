@@ -1,0 +1,9 @@
+<resources>
+	<string name="app_name">AmazonS3-Example</string>
+	<string name="action_settings">Settings</string>
+
+	<!-- never store your S3 credentials like this in a real app! -->
+	<string name="s3_access_key">AKIAIEY74MGX3DYVLAZA</string>
+	<string name="s3_secret">akoCD8Sr4Uj0gUVw3zCdwWho9fWxVFlye6dueA+Z</string>
+	<string name="s3_bucket">s3profilephoto</string>
+</resources>
