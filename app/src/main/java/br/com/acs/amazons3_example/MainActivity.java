@@ -13,29 +13,32 @@ import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+
+
+import com.squareup.okhttp.OkHttpClient;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Locale;
-import java.util.TimeZone;
-
 import br.com.acs.amazons3_example.rest.services.AwsS3;
 import br.com.acs.amazons3_example.utils.AWSOauth;
 import retrofit.Callback;
 import retrofit.RestAdapter;
 import retrofit.RetrofitError;
+import retrofit.client.OkClient;
 import retrofit.client.Response;
-import retrofit.mime.TypedFile;
+import retrofit.mime.TypedByteArray;
+import retrofit.mime.TypedInput;
 
 import static android.app.AlertDialog.*;
 
@@ -62,14 +65,56 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
 
-               // Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LON.setAction("Action", null).show();
+                String bucket = getString(R.string.s3_bucket);
 
+                RestAdapter.Builder builder = new RestAdapter.Builder()
+                    .setEndpoint("http://" + bucket + ".s3.amazonaws.com")
+                    .setLogLevel(RestAdapter.LogLevel.FULL)
+                    .setClient(new OkClient(new OkHttpClient()));
 
-                File file = new File(mCurrentPhotoPath);
+                AwsS3 aws = builder.build().create(AwsS3.class);
 
-                TypedFile typedFile = new TypedFile("multipart/form-data", file);
+                DateTimeFormatter fmt = DateTimeFormat.forPattern("EEE', 'dd' 'MMM' 'yyyy' 'HH:mm:ss' 'Z").withLocale(Locale.US);
+                String ZONE = "GMT";
+                DateTime dt = new DateTime();
+                DateTime dateTime = dt.withZone(DateTimeZone.forID(ZONE)).plusHours(1);
+                String formattedDate = dateTime.toString(fmt);
 
-                uploadImage(typedFile, "teste_foto.jpeg");
+                try {
+
+                    Bitmap bm = BitmapFactory.decodeFile(mCurrentPhotoPath);
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    bm.compress(Bitmap.CompressFormat.JPEG, 100, baos); //bm is the bitmap object
+                    byte[] b = baos.toByteArray();
+
+                    TypedInput body = new TypedByteArray("image/jpg", b);
+
+                    String imageName = "files_" + System.currentTimeMillis();
+
+                    String oauth = AWSOauth.getOAuthAWS(getApplicationContext(), imageName.trim());
+                    String host = bucket + ".s3.amazonaws.com";
+                    String mimeType = body.mimeType();
+                    long length = body.length();
+
+                    aws.upload(imageName.trim(), length, host, formattedDate, mimeType, oauth, body, new Callback<String>() {
+
+                        @Override
+                        public void success(String s, Response response) {
+
+                            Log.d("tag","S = " + s);
+                            Log.d("tag","getHeaders = " + response.getHeaders());
+                            Log.d("tag","Status = " + response.getStatus());
+                        }
+
+                        @Override
+                        public void failure(RetrofitError error) {
+                            Log.d("tag","error: S = " + error.getMessage());
+                        }
+                    });
+
+                }catch (Exception e){
+
+                }
             }
         });
     }
@@ -113,46 +158,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    public void uploadImage(TypedFile typedFile, String fileName){
-
-        String bucket = getString(R.string.s3_bucket);
-
-        RestAdapter restAdapter = new RestAdapter.Builder()
-                .setEndpoint("http://"+bucket+".s3.amazonaws.com")
-                .setLogLevel(RestAdapter.LogLevel.FULL)
-                .build();
-
-        AwsS3 service = restAdapter.create(AwsS3.class);
-
-        DateTimeFormatter fmt = DateTimeFormat.forPattern("EEE', 'dd' 'MMM' 'yyyy' 'HH:mm:ss' 'Z").withLocale(Locale.US);
-        String ZONE = "GMT";
-        DateTime dt = new DateTime();
-        DateTime dtLondon = dt.withZone(DateTimeZone.forID(ZONE)).plusHours(1);
-        String formattedDate = dtLondon.toString(fmt);
-
-        try {
-
-            String oauth = AWSOauth.getOAuthAWS(getApplicationContext(), fileName);
-
-            service.upload(fileName, bucket + ".s3.amazonaws.com", formattedDate, "image/jpeg", oauth, typedFile, new Callback<String>() {
-                @Override
-                public void success(String s, Response response) {
-
-                    Log.d("anderson","response : " + s);
-                }
-
-                @Override
-                public void failure(RetrofitError error) {
-
-                    Log.d("anderson","response : " + error.getMessage());
-
-                }
-            });
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
     private void dialogChooseFrom() {
 
@@ -190,11 +195,10 @@ public class MainActivity extends AppCompatActivity {
 
     private File createImageFile () throws IOException {
 
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String imageFileName = timeStamp + "_";
+        String imageFileName = "file_" + System.currentTimeMillis();
 
         File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        File folder = new File(storageDir.getAbsolutePath() + "/PlayIOFolder");
+        File folder = new File(storageDir.getAbsolutePath() + "/tempFiles");
 
         if (!folder.exists()) {
             folder.mkdir();

@@ -32,7 +32,7 @@ public class AWSOauth {
 
     private static String gerateOAuthAWS(String secretKey, String accessKey, String bucket, String imageName) throws Exception {
 
-        String contentType = "image/jpeg";
+        String contentType = "image/jpg";
 
         DateTimeFormatter fmt = DateTimeFormat.forPattern("EEE', 'dd' 'MMM' 'yyyy' 'HH:mm:ss' 'Z").withLocale(Locale.US);
         String ZONE = "GMT";
@@ -49,8 +49,6 @@ public class AWSOauth {
 
         String signature = ( Base64.encodeToString(hmac.doFinal(stringToSign.getBytes("UTF-8")), Base64.DEFAULT)).replaceAll("\n", "");
 
-        String oauthAWS = "AWS " + accessKey + ":" + signature;
-
-        return  oauthAWS;
+        return  "AWS " + accessKey + ":" + signature;
     }
 }
